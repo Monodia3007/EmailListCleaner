@@ -1,0 +1,122 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
+// Plugin definition - these plugins enable necessary functionalities to complete different stages of the build
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.javamodularity.moduleplugin' version '1.8.12'
+    id 'org.openjfx.javafxplugin' version '0.0.14'
+    id 'org.beryx.jlink' version '2.25.0'
+    id 'com.github.johnrengelman.shadow' version '8.0.0'
+    id "org.sonarqube" version "4.4.1.3373"
+    id 'jacoco'
+    id 'idea'
+}
+
+// Basic Metadata - This section contains basic metadata for your project.
+group = 'eu.lilithmonodia'
+version = '1.0.0'
+
+// Indicate where Gradle should look for dependencies
+repositories {
+    mavenCentral() // Gradle should use the central Maven repository for dependencies
+}
+
+ext {
+    junitVersion = '5.9.2'
+}
+
+
+// Repositories - Specify which repositories gradle will use to fetch project dependencies.
+repositories {
+    mavenCentral()
+}
+
+// Dependencies - Declaring project dependencies (both runtime and test scope).
+dependencies {
+    // Indicate libraries the project needs to compile and run
+    implementation 'org.jetbrains:annotations:24.0.0'
+    implementation 'io.github.mkpaz:atlantafx-base:2.0.1'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.23.1'
+    implementation 'org.apache.logging.log4j:log4j-api:2.23.1'
+    // Indicate libraries needed for testing this project
+    testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+    testImplementation 'org.mockito:mockito-core:3.2.4'
+}
+
+// Jar Config - Configurations for the `Jar` tasks.
+jar {
+    manifest {
+        attributes 'Main-Class': 'eu.lilithmonodia.emaillistcleaner.Launcher'
+        attributes 'Main-Module': 'eu.lilithmonodia.emaillistcleaner'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Application Configuration - Details of the application's main entry.
+application {
+    mainModule = 'eu.lilithmonodia.emaillistcleaner'
+    mainClass = 'eu.lilithmonodia.emaillistcleaner.Launcher'
+}
+
+// JavaFX Configuration - JavaFX related configurations.
+javafx {
+    version = '17.0.7'
+    modules = ['javafx.controls', 'javafx.fxml']
+}
+
+// Configures the `jlink` task to create a custom Java runtime image
+jlink {
+    imageZip = project.file("${buildDir}/distributions/app-${javafx.platform.classifier}.zip")
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    launcher {
+        name = 'EmailListCleaner'
+        mainClassName = 'eu.lilithmonodia.emaillistcleaner.Launcher'
+    }
+    jpackage {
+        installerOptions = ['--name', 'EmailListCleaner', '--app-version', "${version}", '--copyright', 'Lilith Camplin']
+        if (org.gradle.internal.os.OperatingSystem.current().windows) {
+            installerOptions += ['--win-shortcut', '--win-shortcut-prompt', '--win-menu', '--win-dir-chooser']
+        } else if (org.gradle.internal.os.OperatingSystem.current().macOsX) {
+            installerOptions += ['--mac-package-name', 'EmailListCleaner', '--mac-package-identifier', 'eu.lilithmonodia.emaillistcleaner']
+        } else if (org.gradle.internal.os.OperatingSystem.current().linux) {
+            installerOptions += ['--type', 'deb', '--linux-shortcut', '--linux-menu-group', 'Utility']
+        }
+    }
+}
+
+// Shadow JAR - Config for creating a fat JAR or an uber JAR that contains all dependencies.
+shadowJar {
+    archiveBaseName.set('EmailListCleaner')
+    archiveVersion.set("${version}")
+    archiveClassifier.set('shadow')
+    mergeServiceFiles()
+    manifest {
+        attributes 'Main-Class': 'eu.lilithmonodia.emaillistcleaner.Launcher'
+        attributes 'Main-Module': 'eu.lilithmonodia.emaillistcleaner'
+    }
+    configurations = [project.configurations.runtimeClasspath]
+}
+
+javadoc {
+    options {
+        encoding = 'UTF-8'
+        charSet = 'UTF-8'
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+idea {
+    module {
+        downloadJavadoc = true
+        downloadSources = true
+    }
+}
